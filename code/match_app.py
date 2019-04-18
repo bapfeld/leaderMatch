@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 
 class LeaderMatch(QWidget):
+    """Application class to select best match from fuzzy matched names across two world leadership databases"""
     def __init__(self):
         super().__init__()
         self.test_os()
@@ -13,6 +14,7 @@ class LeaderMatch(QWidget):
         self.initUI()
 
     def test_os(self):
+        """Test the OS to set the initial directory correctly"""
         system = platform.system()
         if system == 'Windows':
             self.init_dir = 'C:\\Documents\\'
@@ -20,6 +22,7 @@ class LeaderMatch(QWidget):
             self.init_dir = os.path.expanduser('~/Documents/')
 
     def get_db_fp(self):
+        """Load in a database file"""
         self.db_path, _ = QFileDialog.getOpenFileName(self,
                                                       caption='Select database file',
                                                       directory=self.init_dir,
@@ -28,6 +31,7 @@ class LeaderMatch(QWidget):
             self.load_initial_values()
             
     def get_values(self):
+        """Internal function that selects data from the SQLite DB file"""
         if self.i < self.nrow:
             self.a_leader = self.get_arch_leader(self.match_tmp['archid'].iloc[self.i])
             if not np.isnan(self.match_tmp['m1id'].iloc[self.i]):
@@ -52,6 +56,7 @@ class LeaderMatch(QWidget):
             self.a_leader, self.vdem_leaders, self.pcts = None, [None, None, None], [None, None, None]
             
     def load_initial_values(self):
+        """Function to initialize the program with some data"""
         self.get_index()
         with sqlite3.connect(self.db_path) as conn:
             self.match_tmp = pd.read_sql_query('SELECT * FROM matches', conn)
@@ -73,6 +78,7 @@ class LeaderMatch(QWidget):
             self.p.setText('')
 
     def format_vdem(self, leader, pct=None):
+        """Function to format V-Dem leader information for display in app"""
         if leader is not None:
             vl = leader.drop(axis=1, columns=['vdid'])
             vl.rename(columns={'lname': 'Name',
@@ -92,6 +98,7 @@ class LeaderMatch(QWidget):
             return ''
 
     def format_arch(self, leader):
+        """Function to format Archigos leader information for display in app"""
         if leader is not None:
             ar = leader.drop(axis=1, columns=['archid'])
             ar.rename(columns={'lname': 'Name',
@@ -110,28 +117,33 @@ class LeaderMatch(QWidget):
             return ''
 
     def get_index(self):
+        """Get the current index"""
         # a function to get the current index from the database
         with sqlite3.connect(self.db_path) as conn:
             idx = pd.read_sql_query('SELECT i FROM idx WHERE identifier=0', conn)
         self.i = int(idx['i'][0])
 
     def write_index(self):
+        """Write the current index"""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('UPDATE idx SET i = ? WHERE identifier=0', (self.i, ))
 
     def get_vdem_leader(self, vdid):
+        """Select V-Dem leader information from the database file"""
         sql = 'SELECT * FROM vdem WHERE vdid = %i' %vdid
         with sqlite3.connect(self.db_path) as conn:
             res = pd.read_sql_query(sql, conn)
         return res
 
     def get_arch_leader(self, archid):
+        """Select Archigos leader information from the database file"""
         sql = 'SELECT * FROM arch WHERE archid = %i' %int(archid)
         with sqlite3.connect(self.db_path) as conn:
             res = pd.read_sql_query(sql, conn)
         return res
 
     def export_matched(self):
+        """Courtesy function to export matched leaders"""
         if self.db_path is not None:
             sql = 'SELECT * FROM results'
             with sqlite3.connect(self.db_path) as conn:
@@ -147,6 +159,7 @@ class LeaderMatch(QWidget):
             alert.exec_()
 
     def export_unmatched(self):
+        """Courtesy function to export unmatched leaders."""
         if self.db_path is not None:
             sql_vdem = 'SELECT * FROM vdem WHERE vdid NOT IN (SELECT vdid FROM results)'
             sql_arch = 'SELECT * FROM arch WHERE archid NOT IN (SELECT archid FROM results)'
@@ -167,6 +180,7 @@ class LeaderMatch(QWidget):
             alert.exec_()
             
     def assign_id(self, vdid, archid):
+        """Write the match selection to the database file"""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""INSERT INTO results (vdid, archid) 
                             VALUES (?, ?)
@@ -174,6 +188,7 @@ class LeaderMatch(QWidget):
                             DO UPDATE SET vdid = excluded.vdid""", (vdid, archid))
 
     def detect_button(self):
+        """Internal helper for dealing with radio buttons"""
         if self.v1_button.isChecked():
             return 0
         elif self.v2_button.isChecked():
@@ -184,7 +199,7 @@ class LeaderMatch(QWidget):
             return 3
 
     def select_and_advance(self):
-        # This is a function to get a selection from the radio button, write the choice, and advance
+        """Function to get a selection from the radio button, write the choice, and advance"""
         # Get the selection
         sel = self.detect_button()
         # If a value has been selected, write it to file
@@ -221,6 +236,7 @@ class LeaderMatch(QWidget):
         self.reset_radio_buttons()
 
     def reset_radio_buttons(self):
+        """Awkward function to reset radio buttons"""
         self.v1_button.setCheckable(False)
         self.v2_button.setCheckable(False)
         self.v3_button.setCheckable(False)
@@ -235,7 +251,7 @@ class LeaderMatch(QWidget):
         self.v4_button.setCheckable(True)
         
     def back_index(self):
-        # a function to move the index back one
+        """Function to move the index backwards one"""
         if self.i >= 1:
             self.i -= 1
             self.write_index()
@@ -261,6 +277,7 @@ class LeaderMatch(QWidget):
             alert.exec_()
 
     def get_previous_choice(self, archid):
+        """Function to get previously assigned leader information from the database (when moving backwards with the undo feature)"""
         sql = 'SELECT * FROM vdem WHERE vdid = (SELECT vdid FROM results WHERE archid = %i)' %archid
         with sqlite3.connect(self.db_path) as conn:
             res = pd.read_sql_query(sql, conn)
@@ -286,6 +303,7 @@ class LeaderMatch(QWidget):
             
 
     def initUI(self):
+        """QT GUI definitions"""
         # Basic definitions
         QToolTip.setFont(QFont('SansSerif', 10))
             
@@ -446,6 +464,7 @@ class LeaderMatch(QWidget):
 
     ### Keybindings Time
     def keyPressEvent(self, e):
+        """Keybindings for shortcuts"""
         if e.key() == Qt.Key_Escape:
             self.save_and_exit()
         elif e.key() == Qt.Key_Enter or e.key() == Qt.Key_Return:
@@ -462,6 +481,7 @@ class LeaderMatch(QWidget):
             self.v4_button.setChecked(True)
 
     def save_and_exit(self):
+        """Write index and exit gracefully (used only on exit command, not failure)"""
         if self.db_path is not None:
             self.write_index()
         self.close()
